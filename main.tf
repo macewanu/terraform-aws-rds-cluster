@@ -7,6 +7,11 @@ locals {
   is_regional_cluster      = var.cluster_type == "regional"
   is_serverless            = var.engine_mode == "serverless"
   ignore_admin_credentials = var.replication_source_identifier != "" || var.snapshot_identifier != null
+
+  cluster_parameter_group_name = coalesce(
+    var.cluster_parameter_group_name,
+    join("", aws_rds_cluster_parameter_group.default[*].name)
+  )
 }
 
 data "aws_partition" "current" {
@@ -91,7 +96,7 @@ resource "aws_rds_cluster" "primary" {
   vpc_security_group_ids              = compact(flatten([join("", aws_security_group.default[*].id), var.vpc_security_group_ids]))
   preferred_maintenance_window        = var.maintenance_window
   db_subnet_group_name                = join("", aws_db_subnet_group.default[*].name)
-  db_cluster_parameter_group_name     = join("", aws_rds_cluster_parameter_group.default[*].name)
+  db_cluster_parameter_group_name     = local.cluster_parameter_group_name
   iam_database_authentication_enabled = var.iam_database_authentication_enabled
   tags                                = module.this.tags
   engine                              = var.engine
@@ -105,7 +110,6 @@ resource "aws_rds_cluster" "primary" {
 
   depends_on = [
     aws_db_subnet_group.default,
-    aws_rds_cluster_parameter_group.default,
     aws_security_group.default,
   ]
 
@@ -182,7 +186,7 @@ resource "aws_rds_cluster" "secondary" {
   vpc_security_group_ids              = compact(flatten([join("", aws_security_group.default[*].id), var.vpc_security_group_ids]))
   preferred_maintenance_window        = var.maintenance_window
   db_subnet_group_name                = join("", aws_db_subnet_group.default[*].name)
-  db_cluster_parameter_group_name     = join("", aws_rds_cluster_parameter_group.default[*].name)
+  db_cluster_parameter_group_name     = local.cluster_parameter_group_name
   iam_database_authentication_enabled = var.iam_database_authentication_enabled
   tags                                = module.this.tags
   engine                              = var.engine
@@ -196,7 +200,6 @@ resource "aws_rds_cluster" "secondary" {
   depends_on = [
     aws_db_subnet_group.default,
     aws_db_parameter_group.default,
-    aws_rds_cluster_parameter_group.default,
     aws_security_group.default,
   ]
 
@@ -275,7 +278,6 @@ resource "aws_rds_cluster_instance" "default" {
     aws_db_parameter_group.default,
     aws_iam_role.enhanced_monitoring,
     aws_rds_cluster.secondary,
-    aws_rds_cluster_parameter_group.default,
   ]
 
   lifecycle {
@@ -292,7 +294,7 @@ resource "aws_db_subnet_group" "default" {
 }
 
 resource "aws_rds_cluster_parameter_group" "default" {
-  count       = local.enabled ? 1 : 0
+  count       = (local.enabled && var.cluster_parameter_group_name == null) ? 1 : 0
   name_prefix = "${module.this.id}${module.this.delimiter}"
   description = "DB cluster parameter group"
   family      = var.cluster_family

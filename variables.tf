@@ -97,7 +97,23 @@ variable "cluster_parameters" {
     value        = string
   }))
   default     = []
-  description = "List of DB cluster parameters to apply"
+  description = <<EOF
+    List of DB cluster parameters to apply.
+
+    If provided, a new parameter group will be created using these parameters. To use
+    an existing parameter group, instead use `cluster_parameter_group_name`.
+  EOF
+}
+
+variable "cluster_parameter_group_name" {
+  type = string
+  default = null
+  description = <<EOF
+    Name of the cluster paramter group.
+
+    If provided, this parameter group will be used instead of creating a new parameter
+    group based on `cluster_parameters` (`cluster_parameters` will be ignored).
+  EOF
 }
 
 variable "instance_parameters" {
