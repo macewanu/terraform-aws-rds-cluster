@@ -109,7 +109,7 @@ variable "cluster_parameter_group_name" {
   type = string
   default = null
   description = <<EOF
-    Name of the cluster paramter group.
+    Name of the cluster parameter group.
 
     If provided, this parameter group will be used instead of creating a new parameter
     group based on `cluster_parameters` (`cluster_parameters` will be ignored).
@@ -123,8 +123,25 @@ variable "instance_parameters" {
     value        = string
   }))
   default     = []
-  description = "List of DB instance parameters to apply"
+  description = <<EOF
+    List of DB instance parameters to apply.
+
+    If provided, a new parameter group will be created using these parameters. To use
+    an existing parameter group, instead use `instance_parameter_group_name`.
+  EOF
 }
+
+variable "instance_parameter_group_name" {
+  type = string
+  default = null
+  description = <<EOF
+    Name of the instance parameter group.
+
+    If provided, this parameter group will be used instead of creating a new parameter
+    group based on `instance_parameters` (`instance_parameters` will be ignored).
+  EOF
+}
+
 
 variable "db_cluster_instance_class" {
   type        = string
@@ -299,18 +316,6 @@ variable "rds_monitoring_interval" {
   default     = 0
 }
 
-variable "rds_monitoring_role_arn" {
-  type        = string
-  description = "The ARN for the IAM role that permits RDS to send enhanced monitoring metrics to CloudWatch Logs"
-  default     = null
-}
-
-variable "enhanced_monitoring_role_enabled" {
-  type        = bool
-  description = "A boolean flag to enable/disable the creation of the enhanced monitoring IAM role. If set to `false`, the module will not create a new role and will use `rds_monitoring_role_arn` for enhanced monitoring"
-  default     = false
-}
-
 variable "replication_source_identifier" {
   type        = string
   description = "ARN of a source DB cluster or DB instance if this DB cluster is to be created as a Read Replica"
@@ -469,12 +474,6 @@ variable "egress_enabled" {
   description = "Whether or not to apply the egress security group rule to default security group, defaults to `true`"
   type        = bool
   default     = true
-}
-
-variable "enhanced_monitoring_attributes" {
-  description = "The attributes for the enhanced monitoring IAM role"
-  type        = list(string)
-  default     = ["enhanced-monitoring"]
 }
 
 variable "subnet_group_name" {

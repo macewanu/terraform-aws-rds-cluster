@@ -12,6 +12,11 @@ locals {
     var.cluster_parameter_group_name,
     join("", aws_rds_cluster_parameter_group.default[*].name)
   )
+
+  instance_parameter_group_name = coalesce(
+    var.instance_parameter_group_name,
+    join("", aws_db_parameter_group.default[*].name)
+  )
 }
 
 data "aws_partition" "current" {
@@ -102,7 +107,7 @@ resource "aws_rds_cluster" "primary" {
   engine                              = var.engine
   engine_version                      = var.engine_version
   allow_major_version_upgrade         = var.allow_major_version_upgrade
-  db_instance_parameter_group_name    = var.allow_major_version_upgrade ? join("", aws_db_parameter_group.default[*].name) : null
+  db_instance_parameter_group_name    = local.instance_parameter_group_name
   engine_mode                         = var.engine_mode
   iam_roles                           = var.iam_roles
   backtrack_window                    = var.backtrack_window
@@ -138,8 +143,8 @@ resource "aws_rds_cluster" "primary" {
   dynamic "serverlessv2_scaling_configuration" {
     for_each = var.serverlessv2_scaling_configuration[*]
     content {
-      max_capacity = serverlessv2_scaling_configuration.value.max_capacity
-      min_capacity = serverlessv2_scaling_configuration.value.min_capacity
+      max_capacity = var.serverlessv2_scaling_configuration.max_capacity
+      min_capacity = var.serverlessv2_scaling_configuration.min_capacity
     }
   }
 
@@ -199,7 +204,6 @@ resource "aws_rds_cluster" "secondary" {
 
   depends_on = [
     aws_db_subnet_group.default,
-    aws_db_parameter_group.default,
     aws_security_group.default,
   ]
 
@@ -211,6 +215,14 @@ resource "aws_rds_cluster" "secondary" {
       min_capacity             = lookup(scaling_configuration.value, "min_capacity", null)
       seconds_until_auto_pause = lookup(scaling_configuration.value, "seconds_until_auto_pause", null)
       timeout_action           = lookup(scaling_configuration.value, "timeout_action", null)
+    }
+  }
+
+  dynamic "serverlessv2_scaling_configuration" {
+    for_each = var.serverlessv2_scaling_configuration[*]
+    content {
+      max_capacity = var.serverlessv2_scaling_configuration.max_capacity
+      min_capacity = var.serverlessv2_scaling_configuration.min_capacity
     }
   }
 
@@ -247,14 +259,14 @@ resource "aws_rds_cluster_instance" "default" {
   cluster_identifier                    = coalesce(join("", aws_rds_cluster.primary[*].id), join("", aws_rds_cluster.secondary[*].id))
   instance_class                        = var.serverlessv2_scaling_configuration != null ? "db.serverless" : var.instance_type
   db_subnet_group_name                  = join("", aws_db_subnet_group.default[*].name)
-  db_parameter_group_name               = join("", aws_db_parameter_group.default[*].name)
+  db_parameter_group_name               = local.instance_parameter_group_name
   publicly_accessible                   = var.publicly_accessible
   tags                                  = module.this.tags
   engine                                = var.engine
   engine_version                        = var.engine_version
   auto_minor_version_upgrade            = var.auto_minor_version_upgrade
   monitoring_interval                   = var.rds_monitoring_interval
-  monitoring_role_arn                   = var.enhanced_monitoring_role_enabled ? join("", aws_iam_role.enhanced_monitoring[*].arn) : var.rds_monitoring_role_arn
+  monitoring_role_arn                   = var.rds_monitoring_interval != 0 ? module.rds_monitoring_role.arn : null
   performance_insights_enabled          = var.performance_insights_enabled
   performance_insights_kms_key_id       = var.performance_insights_kms_key_id
   performance_insights_retention_period = var.performance_insights_retention_period
@@ -275,8 +287,7 @@ resource "aws_rds_cluster_instance" "default" {
 
   depends_on = [
     aws_db_subnet_group.default,
-    aws_db_parameter_group.default,
-    aws_iam_role.enhanced_monitoring,
+    module.rds_monitoring_role,
     aws_rds_cluster.secondary,
   ]
 
@@ -316,7 +327,7 @@ resource "aws_rds_cluster_parameter_group" "default" {
 }
 
 resource "aws_db_parameter_group" "default" {
-  count       = local.enabled ? 1 : 0
+  count       = (local.enabled && var.instance_parameter_group_name == null) ? 1 : 0
   name_prefix = "${module.this.id}${module.this.delimiter}"
   description = "DB instance parameter group"
   family      = var.cluster_family
