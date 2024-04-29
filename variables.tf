@@ -505,3 +505,25 @@ variable "activity_stream_kms_key_id" {
   default     = ""
   description = "The ARN for the KMS key to encrypt Activity Stream Data data. When specifying `activity_stream_kms_key_id`, `activity_stream_enabled` needs to be set to true"
 }
+
+variable "database_manage_master_user_password" {
+  type        = bool
+  default     = false
+  description = <<EOF
+    If true, allow RDS to manage the master user password in Secrets Manager.
+
+    Ignored if `secrets_admin_user_password_key` is provided.
+  EOF
+}
+
+variable "database_master_user_secret_kms_key_id" {
+  type        = string
+  default     = null
+  description = <<EOF
+    The ID of the KMS key used to encrypt the master user password in Secrets
+    Manager. If not provided, the default KMS key will be used (aws/secretsmanager).
+
+    Only relevant when both `database_manage_master_user_password` is `true` and
+    `secrets_admin_user_password_key` is NOT provided.
+  EOF
+}

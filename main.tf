@@ -82,8 +82,6 @@ resource "aws_rds_cluster" "primary" {
   count                               = local.enabled && local.is_regional_cluster ? 1 : 0
   cluster_identifier                  = var.cluster_identifier == "" ? module.this.id : var.cluster_identifier
   database_name                       = var.db_name
-  master_username                     = local.ignore_admin_credentials ? null : var.admin_user
-  master_password                     = local.ignore_admin_credentials ? null : var.admin_password
   backup_retention_period             = var.retention_period
   preferred_backup_window             = var.backup_window
   copy_tags_to_snapshot               = var.copy_tags_to_snapshot
@@ -112,6 +110,12 @@ resource "aws_rds_cluster" "primary" {
   iam_roles                           = var.iam_roles
   backtrack_window                    = var.backtrack_window
   enable_http_endpoint                = local.is_serverless && var.enable_http_endpoint
+
+  master_username                     = local.ignore_admin_credentials ? null : var.admin_user
+  master_password                     = local.ignore_admin_credentials || var.database_manage_master_user_password ? null : var.admin_password
+  
+  manage_master_user_password = var.database_manage_master_user_password ? true : null
+  master_user_secret_kms_key_id = var.database_master_user_secret_kms_key_id
 
   depends_on = [
     aws_db_subnet_group.default,
@@ -177,7 +181,7 @@ resource "aws_rds_cluster" "secondary" {
   cluster_identifier                  = var.cluster_identifier == "" ? module.this.id : var.cluster_identifier
   database_name                       = var.db_name
   master_username                     = local.ignore_admin_credentials ? null : var.admin_user
-  master_password                     = local.ignore_admin_credentials ? null : var.admin_password
+  master_password                     = local.ignore_admin_credentials || var.database_manage_master_user_password ? null : var.admin_password
   backup_retention_period             = var.retention_period
   preferred_backup_window             = var.backup_window
   copy_tags_to_snapshot               = var.copy_tags_to_snapshot
@@ -201,6 +205,9 @@ resource "aws_rds_cluster" "secondary" {
   iam_roles                           = var.iam_roles
   backtrack_window                    = var.backtrack_window
   enable_http_endpoint                = local.is_serverless && var.enable_http_endpoint
+
+  manage_master_user_password = var.database_manage_master_user_password
+  master_user_secret_kms_key_id = var.database_master_user_secret_kms_key_id
 
   depends_on = [
     aws_db_subnet_group.default,
@@ -357,7 +364,7 @@ locals {
 
 module "dns_master" {
   source  = "cloudposse/route53-cluster-hostname/aws"
-  version = "0.12.2"
+  version = "0.13.0"
 
   enabled  = local.enabled && length(var.zone_id) > 0
   dns_name = local.cluster_dns_name
@@ -369,7 +376,7 @@ module "dns_master" {
 
 module "dns_replicas" {
   source  = "cloudposse/route53-cluster-hostname/aws"
-  version = "0.12.2"
+  version = "0.13.0"
 
   enabled  = local.enabled && length(var.zone_id) > 0 && !local.is_serverless && local.cluster_instance_count > 0
   dns_name = local.reader_dns_name

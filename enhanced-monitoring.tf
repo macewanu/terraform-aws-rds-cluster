@@ -3,7 +3,7 @@
 
 module "rds_monitoring_role" {
   source  = "cloudposse/iam-role/aws"
-  version = "0.18.0"
+  version = "0.19.0"
 
   role_description      = "Used for enhanced monitoring of rds"
   policy_document_count = 0
