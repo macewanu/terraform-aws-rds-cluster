@@ -78,3 +78,13 @@ output "activity_stream_name" {
   value       = join("", aws_rds_cluster_activity_stream.primary[*].kinesis_stream_name)
   description = "Activity Stream Name"
 }
+
+output "master_user_secret_arn" {
+  value = (local.enabled && var.database_manage_master_user_password ? (
+    (local.is_regional_cluster ? 
+      aws_rds_cluster.primary[0].master_user_secret[0] :
+            aws_rds_cluster.secondary[0].master_user_secret[0]
+    )
+  ) : null
+  )
+}
