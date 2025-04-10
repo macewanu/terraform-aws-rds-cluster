@@ -17,15 +17,16 @@ locals {
     var.instance_parameter_group_name,
     join("", aws_db_parameter_group.default[*].name)
   )
+
+  create_security_group = module.this.enabled && var.create_security_group
 }
 
 data "aws_partition" "current" {
   count = local.enabled ? 1 : 0
 }
 
-# TODO: Use cloudposse/security-group module
 resource "aws_security_group" "default" {
-  count       = local.enabled ? 1 : 0
+  count       = local.create_security_group ? 1 : 0
   name        = module.this.id
   description = "Allow inbound traffic from Security Groups and CIDRs"
   vpc_id      = var.vpc_id
@@ -33,7 +34,7 @@ resource "aws_security_group" "default" {
 }
 
 resource "aws_security_group_rule" "ingress_security_groups" {
-  count                    = local.enabled ? length(var.security_groups) : 0
+  count                    = local.create_security_group ? length(var.security_groups) : 0
   description              = "Allow inbound traffic from existing security groups"
   type                     = "ingress"
   from_port                = var.db_port
@@ -44,7 +45,7 @@ resource "aws_security_group_rule" "ingress_security_groups" {
 }
 
 resource "aws_security_group_rule" "traffic_inside_security_group" {
-  count             = local.enabled && var.intra_security_group_traffic_enabled ? 1 : 0
+  count             = local.create_security_group && var.intra_security_group_traffic_enabled ? 1 : 0
   description       = "Allow traffic between members of the database security group"
   type              = "ingress"
   from_port         = var.db_port
@@ -55,7 +56,7 @@ resource "aws_security_group_rule" "traffic_inside_security_group" {
 }
 
 resource "aws_security_group_rule" "ingress_cidr_blocks" {
-  count             = local.enabled && length(var.allowed_cidr_blocks) > 0 ? 1 : 0
+  count             = local.create_security_group && length(var.allowed_cidr_blocks) > 0 ? 1 : 0
   description       = "Allow inbound traffic from existing CIDR blocks"
   type              = "ingress"
   from_port         = var.db_port
@@ -66,7 +67,7 @@ resource "aws_security_group_rule" "ingress_cidr_blocks" {
 }
 
 resource "aws_security_group_rule" "egress" {
-  count             = local.enabled && var.egress_enabled ? 1 : 0
+  count             = local.create_security_group && var.egress_enabled ? 1 : 0
   description       = "Allow outbound traffic"
   type              = "egress"
   from_port         = 0

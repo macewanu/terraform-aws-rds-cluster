@@ -1,3 +1,13 @@
+variable "create_security_group" {
+  type = bool
+  default = true
+  description = <<EOF
+    If true, create a security group to access the Aurora instance.
+
+    If not specified, `vpc_security_group_ids` must be provided and contain at least one element.
+  EOF
+}
+
 variable "zone_id" {
   type        = any
   default     = []
@@ -460,7 +470,6 @@ variable "enable_http_endpoint" {
 variable "vpc_security_group_ids" {
   type        = list(string)
   description = "Additional security group IDs to apply to the cluster, in addition to the provisioned default security group with ingress traffic from existing CIDR blocks and existing security groups"
-
   default = []
 }
 
